@@ -1,0 +1,12 @@
+# The db user and password are in plain text here for the sake of a simple demo.
+# In a real world project, use the MuleSoft Secure Configuration Properties feature
+# (available in Mule EE) to encrypt them:
+# https://docs.mulesoft.com/mule-runtime/latest/secure-configuration-properties
+db:
+  url: "jdbc:postgresql://db.mycompany.com:5432/online_store"
+  user: "online_store_app"
+  password: "<set for this environment>"
+  
+jms:
+  broker:
+    url: "tcp://broker.mycompany.com:61616"

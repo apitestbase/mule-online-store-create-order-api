@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="c72489ba-ef61-48d7-ba9f-6d40d7e5bf5e" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<db:config name="Database_Config" doc:name="Database Config" doc:id="74761dd7-b810-4114-bbc2-4e21f05bec1f" >
+		<db:generic-connection url="${db.url}" driverClassName="org.postgresql.Driver" user="${db.user}" password="${db.password}" />
+	</db:config>
+	<jms:config name="JMS_Config" doc:name="JMS Config" doc:id="6fbbdb93-56de-45e8-928f-19378e675f2d" >
+		<jms:active-mq-connection >
+			<jms:factory-configuration brokerUrl="${jms.broker.url}" />
+		</jms:active-mq-connection>
+	</jms:config>
+	<global-property doc:name="Global Property" doc:id="5b5a16da-a1d4-43b6-8858-116bdfec84ae" name="env" value="local" />
+	<configuration-properties doc:name="Configuration properties" doc:id="6a3fcdd3-5ee6-46c0-ada7-2722e7661574" file="config/${env}.yaml" />
+	<flow name="mule-online-store-create-order-apiFlow" doc:id="50a898aa-0694-46f7-a903-32f4bd75f726" >
+		<http:listener doc:name="Listener" doc:id="06dfff59-ad35-46c2-a3b1-ec6349f79408" config-ref="HTTP_Listener_config" path="/api/orders" allowedMethods="POST" outputMimeType="application/json">
+			<http:response statusCode="201" />
+		</http:listener>
+		<set-variable value="#[payload]" doc:name="Set order variable" doc:id="0df6da3c-618f-436c-a8f6-1921b763742c" variableName="order"/>
+		<set-variable value="PENDING" doc:name="Set status variable" doc:id="105ff433-2aa5-4cd9-9b47-b0a229d3ffc1" variableName="status"/>
+		<db:insert doc:name="Insert the order into the orders table" doc:id="2a8833cf-54b6-4a46-a8b9-dc462606c682" config-ref="Database_Config" autoGenerateKeys="true">
+			<db:sql ><![CDATA[INSERT INTO orders (customer_code, product_code, quantity, status) VALUES (:customerCode, :productCode, :quantity, :status)]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'customerCode': payload.customerCode,
+	'productCode': payload.productCode,
+	'quantity': payload.quantity,
+	'status': vars.status
+}]]]></db:input-parameters>
+		</db:insert>
+		<set-variable value="#[payload.generatedKeys.order_id]" doc:name="Set orderId variable" doc:id="906266d1-4dea-49a6-8a1a-cf93b6f76f40" variableName="orderId"/>
+		<set-variable value="#[payload.generatedKeys.created_at]" doc:name="Set createdAt variable" doc:id="3b1c7f42-9d5e-4a86-b7c1-5e2f8a904d13" variableName="createdAt"/>
+		<set-payload value="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;    'orderId': vars.orderId,&#10;    'customerCode': vars.order.customerCode,&#10;    'productCode': vars.order.productCode,&#10;    'quantity': vars.order.quantity,&#10;    'status': vars.status,&#10;    'createdAt': vars.createdAt as String {format: &quot;yyyy-MM-dd'T'HH:mm:ss.SSS&quot;}&#10;}]" doc:name="Set payload for JMS Publish" doc:id="0d514675-2271-4d28-8008-2599e59145f0" />
+		<jms:publish doc:name="Publish event to the order.created queue" doc:id="ca903b3e-657f-4c4e-bfa8-1cb28d50dc3c" config-ref="JMS_Config" destination="order.created" persistentDelivery="true"/>
+		<set-payload value="#[%dw 2.0&#10;output application/json&#10;---&#10;{&#10;	'orderId': vars.orderId,&#10;	'status': vars.status&#10;}]" doc:name="Set payload for API response" doc:id="cabd6d11-3afb-41ad-9794-17e5ad62ed07" />
+	</flow>
+</mule>

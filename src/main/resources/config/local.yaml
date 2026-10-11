@@ -1,0 +1,15 @@
+# The db user and password are in plain text here for the sake of a simple demo.
+# In a real world project, use the MuleSoft Secure Configuration Properties feature
+# (available in Mule EE) to encrypt them:
+# https://docs.mulesoft.com/mule-runtime/latest/secure-configuration-properties
+db:
+  url: "jdbc:postgresql://localhost:5432/online_store"
+  # The stub PostgreSQL container is created by a setup in the ATB workspace,
+  # using the online.store.db.username and online.store.db.password secrets.
+  # These two values must match those secrets.
+  user: "postgres"
+  password: "postgres"
+
+jms:
+  broker:
+    url: "tcp://localhost:61616"
